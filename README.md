@@ -116,6 +116,8 @@ Feel free to fork the repository and submit pull requests. Contributions are wel
 ## Draft requirements 
 
 Please refer to the below google docs 
+https://docs.google.com/document/d/1D_efhIfCjikWhoY43WqJOOe25DEKsWeXIbmEpqkFJfo/edit?tab=t.0
+I will have those tasks added under our sustaining jira project soon.
 
 ## TBD 
 1. We need to raise a slack addon enablement service now ticket (https://redhat.service-now.com/help?id=sc_cat_item&sys_id=35bfc06313b82a00dce03ff18144b0d2 ) for this bot to be added to our workspace.
