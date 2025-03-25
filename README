@@ -1,0 +1,107 @@
+# OCP Infra Slack Bot
+
+This is a Slack bot built to help users interact with AWS and OpenStack cloud resources through simple commands. The bot can create OpenShift clusters in AWS and virtual machines in OpenStack etc etc. It can connect to JIRA and Jenkins to perform some tasks.It also provides helpful information when mentioned or through direct messages.
+
+## Features
+
+- **Create AWS OpenShift Clusters**: Easily create an OpenShift cluster in AWS using the `create-aws-cluster` command.
+- **Create OpenStack Virtual Machines**: Create a VM on OpenStack using the `create-openstack-vm` command.
+- **Help Command**: The bot responds with a list of available commands when mentioned with the word `help`.
+- **Message Handling**: The bot can respond to messages and mentions, providing helpful information or performing actions based on user input.
+
+## Technologies
+
+- **Slack Bolt for Python**: Framework for building Slack apps.
+- **AWS SDK (Boto3)**: Interact with AWS services like EC2 and ROSA.
+- **OpenStack SDK**: Interact with OpenStack resources.
+- **Python 3.x**: The language used for development.
+
+## Requirements
+
+- Python 3.8 or higher
+- Slack App with `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`
+- AWS account with `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+- OpenStack credentials (`OS_AUTH_URL`, `OS_PROJECT_NAME`, `OS_INTERFACE`, `OS_ID_API_VERSION`,`OS_REGION_NAME`,`OS_APP_CRED_ID`,`OS_APP_CRED_SECRET`,`OS_AUTH_TYPE`)
+- AZURE
+- GCP
+- JIRA
+- JENKINS
+
+## Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/ocp-infra-slack-bot.git
+cd ocp-infra-bot
+
+### 2. Create a Virtual Environment
+It’s recommended to use a virtual environment to manage dependencies:
+
+bash
+Copy
+Edit
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+
+### 4. Configure Environment Variables
+Create a .env file in the root directory and add your Slack and cloud credentials:
+
+```bash
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+SLACK_APP_TOKEN=xapp-your-slack-app-token
+
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+AWS_DEFAULT_REGION=us-west-2
+
+OS_AUTH_URL=https://your-openstack-auth-url
+OS_PROJECT_NAME=your-openstack-project-name
+.
+.
+.
+
+
+### 5. Run the Bot
+
+```bash
+python slack_main.py
+
+## Slack Commands
+
+**/create-aws-cluster <cluster_name>**
+Creates an AWS OpenShift cluster using the provided cluster_name.
+
+**/create-openstack-vm <name> <image> <flavor> <network>**
+Creates an OpenStack VM with the specified name, image, flavor, and network.
+
+**/hello**
+Greets the user with a friendly message.
+
+**/help**
+Lists the available commands and how to use them.
+
+## Event Handling
+
+The bot responds to the following events:
+
+Direct Messages: Responds to DMs with helpful information.
+Mentions: If the bot is mentioned in a message, it can respond with a message or trigger an action.
+
+
+## Contributions
+
+Feel free to fork the repository and submit pull requests. Contributions are welcome!
+
+1. Fork this repository
+2. Create a new branch (git checkout -b feature-branch)
+3. Commit your changes (git commit -am 'Add new feature')
+4. Push to the branch (git push origin feature-branch)
+5. Create a new Pull Request

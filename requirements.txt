@@ -1,0 +1,7 @@
+boto3
+openshift
+openstacksdk
+requests
+python-dotenv
+slack-bolt
+aiohttp
