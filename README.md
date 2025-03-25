@@ -96,7 +96,9 @@ Mentions: If the bot is mentioned in a message, it can respond with a message or
 
 ## Contributions
 
-Feel free to fork the repository and submit pull requests. Contributions are welcome!
+Skills required for contributsions are the basic python coding , cloud providers SDK  , jira and jekins integration knowledge . Even if you dont have it we can learn and do it.
+
+Feel free to fork the repository and submit pull requests. Contributions are welcome! 
 
 1. Fork this repository
 2. Create a new branch (git checkout -b feature-branch)
@@ -110,6 +112,10 @@ Feel free to fork the repository and submit pull requests. Contributions are wel
 3. Make sure you add your local .env file with all secrets to the repo root.
 4. Once you have your code changes ready the run the code locally using `python slack_main.py` 
 5. Then from the slackbot template workspace run your command by mention or direct message to test.
+
+## Draft requirements 
+
+Please refer to the below google docs 
 
 ## TBD 
 1. We need to raise a slack addon enablement service now ticket (https://redhat.service-now.com/help?id=sc_cat_item&sys_id=35bfc06313b82a00dce03ff18144b0d2 ) for this bot to be added to our workspace.
