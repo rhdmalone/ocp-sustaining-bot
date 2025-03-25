@@ -35,24 +35,22 @@ This is a Slack bot built to help users interact with AWS and OpenStack cloud re
 git clone https://github.com/openshift-sustaining/ocp-sustaining-bot.git
 cd ocp-sustaining-bot
 
+```
+
 ### 2. Create a Virtual Environment
 It’s recommended to use a virtual environment to manage dependencies:
-
-bash
-Copy
-Edit
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-
+```
 ### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
-
+```
 ### 4. Configure Environment Variables
-Create a .env file in the root directory and add your Slack and cloud credentials:
+Create a .env file in the root directory and add your Slack and cloud credentials you received from admin:
 
 ```bash
 SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
@@ -67,13 +65,13 @@ OS_PROJECT_NAME=your-openstack-project-name
 .
 .
 .
-
+```
 
 ### 5. Run the Bot
 
 ```bash
 python slack_main.py
-
+```
 ## Slack Commands
 
 **/create-aws-cluster <cluster_name>**
@@ -109,10 +107,11 @@ Feel free to fork the repository and submit pull requests. Contributions are wel
 ## Testing
 1. There is a slack bot namely : ocp-sustaining-bot is already created and whose credentials will be shared with you along with other cloud credentials.
 2. There is a testing slack workspace created : slackbot-template.slack.com . Please get added your user/mail to this by admin.
-3. Once you have your code changes ready the run the code locally using `python slack_main.py` 
-4. Then from the slackbot template workspace run your command by mention or direct message to test.
+3. Make sure you add your local .env file with all secrets to the repo root.
+4. Once you have your code changes ready the run the code locally using `python slack_main.py` 
+5. Then from the slackbot template workspace run your command by mention or direct message to test.
 
-##TBD 
+## TBD 
 1. We need to raise a slack addon enablement service now ticket (https://redhat.service-now.com/help?id=sc_cat_item&sys_id=35bfc06313b82a00dce03ff18144b0d2 ) for this bot to be added to our workspace.
 2. Once we are ready with basic commands we can deploy this to our server / or any redhat platform where we run production workloads.  Then ppl can start using this on redhat workspace. 
 3. We need to limit this bot our user group which is not done yet.
