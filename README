@@ -32,8 +32,8 @@ This is a Slack bot built to help users interact with AWS and OpenStack cloud re
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/ocp-infra-slack-bot.git
-cd ocp-infra-bot
+git clone https://github.com/openshift-sustaining/ocp-sustaining-bot.git
+cd ocp-sustaining-bot
 
 ### 2. Create a Virtual Environment
 It’s recommended to use a virtual environment to manage dependencies:
@@ -105,3 +105,15 @@ Feel free to fork the repository and submit pull requests. Contributions are wel
 3. Commit your changes (git commit -am 'Add new feature')
 4. Push to the branch (git push origin feature-branch)
 5. Create a new Pull Request
+
+## Testing
+1. There is a slack bot namely : ocp-sustaining-bot is already created and whose credentials will be shared with you along with other cloud credentials.
+2. There is a testing slack workspace created : slackbot-template.slack.com . Please get added your user/mail to this by admin.
+3. Once you have your code changes ready the run the code locally using `python slack_main.py` 
+4. Then from the slackbot template workspace run your command by mention or direct message to test.
+
+##TBD 
+1. We need to raise a slack addon enablement service now ticket (https://redhat.service-now.com/help?id=sc_cat_item&sys_id=35bfc06313b82a00dce03ff18144b0d2 ) for this bot to be added to our workspace.
+2. Once we are ready with basic commands we can deploy this to our server / or any redhat platform where we run production workloads.  Then ppl can start using this on redhat workspace. 
+3. We need to limit this bot our user group which is not done yet.
+4. We need to create a build ,test , deploy pipeline to prod for automating new change deployment. Will use github actions.
