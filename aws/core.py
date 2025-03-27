@@ -1,5 +1,4 @@
 import boto3
-import os
 from config import config
 import subprocess
 
@@ -10,39 +9,41 @@ class AWSHelper:
         self.session = boto3.Session(
             aws_access_key_id=config.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY,
-            region_name=self.region
+            region_name=self.region,
         )
 
     def list_instances(self):
         """
         List all EC2 instances in the specified region.
         """
-        ec2 = self.session.client('ec2')
+        ec2 = self.session.client("ec2")
         response = ec2.describe_instances()
-        return response['Reservations']
+        return response["Reservations"]
 
-    def create_instance(self, image_id, instance_type, key_name, security_group_id, subnet_id):
+    def create_instance(
+        self, image_id, instance_type, key_name, security_group_id, subnet_id
+    ):
         """
         Create an EC2 instance with the given parameters.
         """
-        ec2 = self.session.resource('ec2')
+        ec2 = self.session.resource("ec2")
         try:
-               instance_params = {
-                 'ImageId': image_id,
-                 'InstanceType': instance_type,
-                 'KeyName': key_name,
-                 'SecurityGroupIds': [security_group_id],
-                 'MinCount': 1,
-                 'MaxCount': 1,
-               }
-               if subnet_id:
-                  instance_params['SubnetId'] = subnet_id
+            instance_params = {
+                "ImageId": image_id,
+                "InstanceType": instance_type,
+                "KeyName": key_name,
+                "SecurityGroupIds": [security_group_id],
+                "MinCount": 1,
+                "MaxCount": 1,
+            }
+            if subnet_id:
+                instance_params["SubnetId"] = subnet_id
 
-               instances = ec2.create_instances(**instance_params)
-               return instances[0]
+            instances = ec2.create_instances(**instance_params)
+            return instances[0]
         except Exception as e:
-               print(f"An error occurred: {e}")
-               return None
+            print(f"An error occurred: {e}")
+            return None
 
 
 class ROSAHelper(AWSHelper):
@@ -53,17 +54,25 @@ class ROSAHelper(AWSHelper):
         """
         if not cluster_name:
             if say:
-                say("Please provide a cluster name. Usage: `create-aws-cluster <cluster_name>`")
+                say(
+                    "Please provide a cluster name. Usage: `create-aws-cluster <cluster_name>`"
+                )
                 return
 
         if say:
-            say(f"Creating AWS OpenShift cluster: {cluster_name} in region {self.region}...")
+            say(
+                f"Creating AWS OpenShift cluster: {cluster_name} in region {self.region}..."
+            )
 
         try:
             command = [
-                "rosa", "create", "cluster", 
-                "--cluster-name", cluster_name, 
-                "--region", self.region
+                "rosa",
+                "create",
+                "cluster",
+                "--cluster-name",
+                cluster_name,
+                "--region",
+                self.region,
             ]
             subprocess.run(command, check=True)
             if say:

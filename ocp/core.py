@@ -1,5 +1,6 @@
 from openshift import client, config
 
+
 class OpenShiftHelper:
     def __init__(self, kubeconfig_path):
         config.load_kube_config(kubeconfig_path)

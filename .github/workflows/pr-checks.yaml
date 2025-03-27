@@ -7,28 +7,17 @@ on:
 
 jobs:
   lint:
-    name: Run Pylint
-    runs-on: ubuntu-latest
+    - name: Install Ruff
+      run: |
+        pip install ruff
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.x
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pylint
-          # Install your project dependencies if required
-          # pip install -r requirements.txt
-
-      - name: Run Pylint
-        run: |
-          pylint *.py --exit-zero
+    - name: Run Ruff Linter
+      run: |
+        # Check for linting issues
+        ruff check . --output-format=github
+        # Fail if any formatting issue is found
+        ruff format --check .
+ 
 
   check-env-files:
     name: Check for .env and Secrets
@@ -58,7 +47,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.x
+          python-version: 3.12
 
       - name: Install Dependencies
         run: |
