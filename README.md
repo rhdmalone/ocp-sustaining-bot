@@ -121,7 +121,8 @@ https://docs.google.com/document/d/1D_efhIfCjikWhoY43WqJOOe25DEKsWeXIbmEpqkFJfo/
 I will have those tasks added under our sustaining jira project soon.
 
 ## TBD 
-1. We need to raise a slack addon enablement service now ticket (https://redhat.service-now.com/help?id=sc_cat_item&sys_id=35bfc06313b82a00dce03ff18144b0d2 ) for this bot to be added to our workspace.
-2. Once we are ready with basic commands we can deploy this to our server / or any redhat platform where we run production workloads.  Then ppl can start using this on redhat workspace. 
-3. We need to limit this bot our user group which is not done yet.
-4. We need to create a build ,test , deploy pipeline to prod for automating new change deployment. Will use github actions.
+1. unit tests to be added
+2. We need to raise a slack addon enablement service now ticket (https://redhat.service-now.com/help?id=sc_cat_item&sys_id=35bfc06313b82a00dce03ff18144b0d2 ) for this bot to be added to our workspace.
+3. Once we are ready with basic commands we can deploy this to our server / or any redhat platform where we run production workloads.  Then ppl can start using this on redhat workspace. 
+4. We need to limit this bot our user group which is not done yet.
+5. We need to create a build ,test , deploy pipeline to prod for automating new change deployment. Will use github actions.
