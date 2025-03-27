@@ -62,4 +62,5 @@ jobs:
 
       - name: Run Entrypoint 
         run: |
-          python slack_main.py || exit 1
+           export $(cat vars | xargs)
+           python -c "import slack_main" || exit 1
