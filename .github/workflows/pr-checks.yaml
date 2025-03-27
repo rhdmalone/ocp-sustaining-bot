@@ -57,9 +57,9 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install project dependencies if needed
-          # pip install -r requirements.txt
+          # Install project dependencies 
+          pip install -r requirements.txt
 
-      - name: Run Entrypoint (slack_main.py)
+      - name: Run Entrypoint 
         run: |
           python slack_main.py || exit 1
