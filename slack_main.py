@@ -8,7 +8,7 @@ from helpers import (
     handle_create_rosa_cluster,
     handle_create_openstack_vm,
     handle_hello,
-    handle_create_aws_vm
+    handle_create_aws_vm,
 )
 
 app = App(token=config.SLACK_BOT_TOKEN)
