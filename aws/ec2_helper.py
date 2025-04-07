@@ -1,6 +1,5 @@
 import boto3
 from config import config
-import subprocess
 
 
 class EC2Helper:
