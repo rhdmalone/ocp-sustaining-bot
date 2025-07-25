@@ -17,6 +17,14 @@ on:
         description: 'Minor Version'
         required: true
         default: "1"
+      push_when_critical_errors_in_scan:
+        description: 'Push when Critical Errors in Scan'
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 jobs:
   build-and-push:
@@ -47,63 +55,166 @@ jobs:
 
       # e.g. if there are 24 previous images starting with the tag name "1.1."
       # the next tag name will be 1.1.25
-      run: |
-        PAGE=1
-        LIMIT=50
-        HAS_MORE=true
-        # Initialize an empty JSON array
-        ALL_TAGS='[]'
-        
-        FILTER_PARAMS="&onlyActiveTags=1&filter_tag_name=like:${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}."
-        
-        while [ "$HAS_MORE" = true ]; do
-          echo "Fetching page $PAGE..."
-          PAGE_AND_LIMIT_PARAMS="?limit=$LIMIT&page=$PAGE"
-          if ! JSON_RESPONSE=$(curl -s -f --max-time 300 "$SLACKBOT_IMAGE_REPO_URL$PAGE_AND_LIMIT_PARAMS$FILTER_PARAMS"); then
-            echo "Failed to fetch tags from API"
-            exit 1
-          fi
-        
-          # Extract just the tags and append to ALL_TAGS
-          TAGS=$(echo "$JSON_RESPONSE" | jq '.tags')
-          ALL_TAGS=$(jq -s 'add' <(echo "$ALL_TAGS") <(echo "$TAGS"))
-        
-          HAS_MORE=$(echo "$JSON_RESPONSE" | jq '.has_additional')
-          PAGE=$((PAGE + 1))
-        done
-        
-        # Now ALL_TAGS contains all the tags from all pages
-        COUNT_EXISTING=$(echo "$ALL_TAGS" | jq '. | length')
-        
-        if [ "$COUNT_EXISTING" -eq 0 ]; then
-            echo "There are no docker images with version numbers that start with ${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}."
-            NEXT_TAG_VERSION="${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}.${{ env.TAG_PATCH_VERSION }}"
-        else
-            echo "There are $COUNT_EXISTING docker images with version numbers that start with ${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}"
-            MAX_VER=$(echo "$ALL_TAGS" | jq -r '.[].name'| sort -V | tail -n1)
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$MAX_VER"
-            NEW_PATCH=$((PATCH + 1))
-            NEXT_TAG_VERSION="${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}.${NEW_PATCH}"
-        fi        
-        echo "NEXT_TAG_VERSION=$NEXT_TAG_VERSION" >> $GITHUB_ENV
-        echo "Computed image version: $NEXT_TAG_VERSION"
+      uses: nick-fields/retry@v2  # Add retry action
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        retry_on: error
+        command: |
+          PAGE=1
+          LIMIT=50
+          HAS_MORE=true
+          # Initialize an empty JSON array
+          ALL_TAGS='[]'
+          
+          FILTER_PARAMS="&onlyActiveTags=1&filter_tag_name=like:${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}."
+          
+          while [ "$HAS_MORE" = true ]; do
+            echo "Fetching page $PAGE..."
+            PAGE_AND_LIMIT_PARAMS="?limit=$LIMIT&page=$PAGE"
+            if ! JSON_RESPONSE=$(curl -s -f --max-time 300 "$SLACKBOT_IMAGE_REPO_URL$PAGE_AND_LIMIT_PARAMS$FILTER_PARAMS"); then
+              echo "Failed to fetch tags from API"
+              exit 1
+            fi
+          
+            # Extract just the tags and append to ALL_TAGS
+            TAGS=$(echo "$JSON_RESPONSE" | jq '.tags')
+            ALL_TAGS=$(jq -s 'add' <(echo "$ALL_TAGS") <(echo "$TAGS"))
+          
+            HAS_MORE=$(echo "$JSON_RESPONSE" | jq '.has_additional')
+            PAGE=$((PAGE + 1))
+          done
+          
+          # Now ALL_TAGS contains all the tags from all pages
+          COUNT_EXISTING=$(echo "$ALL_TAGS" | jq '. | length')
+          
+          if [ "$COUNT_EXISTING" -eq 0 ]; then
+              echo "There are no docker images with version numbers that start with ${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}."
+              NEXT_TAG_VERSION="${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}.${{ env.TAG_PATCH_VERSION }}"
+          else
+              echo "There are $COUNT_EXISTING docker images with version numbers that start with ${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}"
+              MAX_VER=$(echo "$ALL_TAGS" | jq -r '.[].name'| sort -V | tail -n1)
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$MAX_VER"
+              NEW_PATCH=$((PATCH + 1))
+              NEXT_TAG_VERSION="${{ inputs.tag_major_version }}.${{ inputs.tag_minor_version }}.${NEW_PATCH}"
+          fi        
+          echo "NEXT_TAG_VERSION=$NEXT_TAG_VERSION" >> $GITHUB_ENV
+          echo "Computed image version: $NEXT_TAG_VERSION"
 
     - name: Mask Values and Login
+      id: login
       shell: bash
       run: |
+        set -e  # Exit immediately if any command fails
+        
         QUAY_PASSWORD=$(jq -r '.inputs.quay_registry_password' $GITHUB_EVENT_PATH)
+        if ! QUAY_PASSWORD=$(jq -r '.inputs.quay_registry_password' $GITHUB_EVENT_PATH); then
+          echo "❌ Failed to extract password from input"
+          exit 1
+        fi
         echo ::add-mask::$QUAY_PASSWORD
+        
         QUAY_USERNAME=$(jq -r '.inputs.quay_registry_username' $GITHUB_EVENT_PATH)
+        if ! QUAY_USERNAME=$(jq -r '.inputs.quay_registry_username' $GITHUB_EVENT_PATH); then
+          echo "❌ Failed to extract username from input"
+          exit 1
+        fi
         echo ::add-mask::$QUAY_USERNAME
-        echo "$QUAY_PASSWORD" | docker login quay.io -u $QUAY_USERNAME --password-stdin 2>/dev/null
+        
+        echo "🔐 Attempting to login to quay.io..."
+        if ! echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin 2>/dev/null; then
+          echo "❌ Docker login to quay.io failed! Check your credentials."
+          echo "Username: $QUAY_USERNAME"
+          echo "Registry: quay.io"
+          exit 1
+        fi
+        echo "✅ Successfully logged into quay.io"
+        echo "LOGIN_SUCCESS=true" >> $GITHUB_ENV
 
-    - name: Build and push Docker image
+    - name: Login Failed - Workflow Terminated
+      if: always() && steps.login.outcome == 'failure'
+      run: |
+        echo "🛑 WORKFLOW TERMINATED: Docker login to quay.io failed!"
+        echo ""
+        echo "The workflow has been stopped because authentication failed."
+        echo "Please check your Quay.io credentials and try again."
+        echo ""
+        echo "To fix this issue:"
+        echo "  1. Verify your Quay.io username is correct"
+        echo "  2. Verify your Quay.io password/token is correct and has not expired"
+        echo "  3. Ensure your Quay.io account has push permissions to the repository"
+        echo ""
+        echo "No further steps will be executed until login succeeds."
+        exit 1
+
+    - name: Build Docker image locally
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: ${{ env.IMAGE_NAME }}:${{ env.NEXT_TAG_VERSION }}
+        load: true
+      timeout-minutes: 30  # Add timeout
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      id: trivy-scan
+      with:
+        image-ref: ${{ env.IMAGE_NAME }}:${{ env.NEXT_TAG_VERSION }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL'
+        exit-code: '1'
+
+    - name: Determine if we should push
+      id: should_push
+      if: always() && steps.login.outcome == 'success'
+      run: |
+        SHOULD_PUSH="false"
+        
+        if [ "${{ steps.trivy-scan.outcome }}" == "success" ]; then
+          echo "✅ Trivy scan passed - will push image"
+          SHOULD_PUSH="true"
+        elif [ "${{ inputs.push_when_critical_errors_in_scan }}" == "true" ]; then
+          echo "⚠️  Trivy scan failed but push_when_critical_errors_in_scan is true - will push image"
+          SHOULD_PUSH="true"
+        else
+          echo "❌ Trivy scan failed and push_when_critical_errors_in_scan is false - will NOT push image"
+        fi
+        
+        echo "Final decision: SHOULD_PUSH=$SHOULD_PUSH"
+        echo "SHOULD_PUSH=$SHOULD_PUSH" >> $GITHUB_ENV
+
+    - name: Push Docker image to Quay
+      if: always() && steps.login.outcome == 'success' && env.SHOULD_PUSH == 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
         tags: ${{ env.IMAGE_NAME }}:${{ env.NEXT_TAG_VERSION }}
 
-    - name: Logout
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && steps.login.outcome == 'success'
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Report scan results
+      if: always() && steps.login.outcome == 'success'
       run: |
-        docker logout quay.io
+        if [ "${{ steps.trivy-scan.outcome }}" == "success" ]; then
+          echo "✅ Trivy security scan passed. Docker image has been pushed to Quay."
+        else
+          echo "❌ Trivy security scan failed with critical severity vulnerabilities."
+          echo "Docker image was not pushed to the registry."
+        fi
+
+    - name: Logout
+      if: always()
+      run: |
+        echo "🔓 Logging out from quay.io..."
+        if docker logout quay.io 2>/dev/null; then
+          echo "✅ Successfully logged out from quay.io"
+        else
+          echo "⚠️  Logout failed or was not needed (not currently logged in)"
+        fi
