@@ -1,40 +1,70 @@
 from sdk.aws.ec2 import EC2Helper
 from sdk.openstack.core import OpenStackHelper
 from config import config
+from sdk.tools.help_system import (
+    command_meta,
+    handle_help_command,
+    get_openstack_os_names,
+    get_openstack_statuses,
+    get_openstack_flavors,
+    get_aws_instance_states,
+    get_aws_instance_types,
+)
 import logging
 import traceback
 
 
-#
 logger = logging.getLogger(__name__)
 
 
 # Helper function to handle the "help" command
-def handle_help(say, user):
-    try:
-        logger.info(
-            f"Help command invoked by user: {user}. Sending list of available commands."
-        )
-        say(
-            f"Hello <@{user}>! Here's what I can help you with:\n\n"
-            "*Available Commands:*\n"
-            "`hello` - Greet the bot.\n"
-            "`help` - Show this help message.\n"
-            "`list-team-links` - Display important team links.\n"
-            "`create-openstack-vm <name> <image> <flavor> <network>` - Create an OpenStack VM.\n"
-            "`list-openstack-vms [--status=active,shutoff]` : List OpenStack VMs optionally filtered by status.\n"
-            "`create-aws-vm <os_name> <instance_type> <key_pair=new,existing>` - Create an AWS EC2 instance.\n"
-            "`list-aws-vms [--state=pending,running,stopped]` : List AWS VMs optionally filtered by state.\n"
-            "`aws-modify-vm --stop --vm-id=<id>` - Stop an AWS EC2 instance.\n"
-            "`aws-modify-vm --delete --vm-id=<id>` - Delete an AWS EC2 instance.\n"
-        )
-
-    except Exception as e:
-        logger.error(f"Error in handle_help: {e}")
+@command_meta(
+    name="help",
+    description="Show help information for commands",
+    arguments={
+        "command": {
+            "description": "Specific command to get help for",
+            "required": False,
+            "type": "str",
+        }
+    },
+    examples=["help", "help create-openstack-vm"],
+)
+def handle_help(say, user, command_name=None):
+    """Handle help command using the new help system."""
+    handle_help_command(say, user, command_name)
 
 
 # Helper function to handle creating an OpenStack VM
-def handle_create_openstack_vm(say, user, params_dict):
+@command_meta(
+    name="create-openstack-vm",
+    description="Create an OpenStack VM with specified configuration",
+    arguments={
+        "name": {"description": "Name for the VM", "required": True, "type": "str"},
+        "os_name": {
+            "description": "Operating system name",
+            "required": True,
+            "type": "str",
+            "choices": get_openstack_os_names,
+        },
+        "flavor": {
+            "description": "VM flavor/size (e.g., ci.cpu.small)",
+            "required": True,
+            "type": "str",
+            "choices": get_openstack_flavors,
+        },
+        "key_pair": {
+            "description": "Whether to use new or existing keypair",
+            "required": True,
+            "type": "str",
+            "choices": ["new", "existing"],
+        },
+    },
+    examples=[
+        "create-openstack-vm --name=myvm --os_name=fedora --flavor=ci.cpu.small --key_pair=new"
+    ],
+)
+def handle_create_openstack_vm(say, user, app, params_dict):
     try:
         if not isinstance(params_dict, dict):
             raise ValueError(
@@ -45,14 +75,14 @@ def handle_create_openstack_vm(say, user, params_dict):
         name = params_dict.get("name")
         os_name = params_dict.get("os_name")
         flavor = params_dict.get("flavor")
-        key_name = params_dict.get("key_name")
+        key_pair = params_dict.get("key_pair")  # `new` or `existing`
 
         logger.info(
-            f"Parsed Parameters: name={name}, os_name={os_name}, flavor={flavor}, key_name={key_name}"
+            f"Parsed Parameters: name={name}, os_name={os_name}, flavor={flavor}, key_pair={key_pair}"
         )
 
         # Validate required fields
-        required_params = ["name", "os_name", "flavor", "key_name"]
+        required_params = ["name", "os_name", "flavor", "key_pair"]
         missing_params = [
             param for param in required_params if not params_dict.get(param)
         ]
@@ -60,13 +90,13 @@ def handle_create_openstack_vm(say, user, params_dict):
         if missing_params:
             say(
                 f":warning: Missing required parameters: {', '.join(missing_params)}. "
-                f"Usage: create-openstack-vm --name=<name> --os_name=<os_name> --flavor=<flavor> --key_name=<key>\n"
+                f"Usage: create-openstack-vm --name=<name> --os_name=<os_name> --flavor=<flavor> --key_pair=[new|existing]\n"
                 f"Supported OS names: {', '.join(config.OS_IMAGE_MAP.keys())}"
             )
             return
 
         # Normalize OS name and retrieve corresponding image ID
-        os_name_lower = os_name.strip().lower()
+        os_name_lower = os_name.strip().lower() if os_name else ""
         image_id = config.OS_IMAGE_MAP.get(os_name_lower)
 
         if not image_id:
@@ -89,12 +119,29 @@ def handle_create_openstack_vm(say, user, params_dict):
 
         logger.info(f"Using Image ID: {image_id} and Network ID: {network_id}")
 
+        if key_pair not in ("new", "existing"):
+            say("`key_pair` should either be `new` or `existing`.")
+            logger.debug(f"invalid `key_pair` value: {key_pair}")
+            return
+
         say(
             ":hourglass_flowing_sand: Now processing your request for an OpenStack VM... Please wait."
         )
         openstack_helper = OpenStackHelper()
+
+        key_pair = _helper_select_keypair(
+            key_pair, user, app, "OpenStack", image_id, flavor, say, openstack_helper
+        )
+
+        if not key_pair:
+            logging.error(
+                f"Fetching/creating Openstack keypair failed for user {user} Aborting."
+            )
+            say("Some problem occurred during keypair selection. Aborting VM creation")
+            return
+
         response = openstack_helper.create_servers(
-            name, image_id, flavor, key_name, network_id
+            name, image_id, flavor, key_pair["KeyName"], network_id
         )
 
         # Extract result from response
@@ -128,7 +175,7 @@ def handle_create_openstack_vm(say, user, params_dict):
                 "Make sure your key file has the correct permissions: `chmod 400 <path_to_your_private_key.pem>`\n"
                 "\n\n"
                 ":warning: *Key Pair Access:*\n"
-                f"To access this instance via SSH, you should have the `{instance_info.get('key_name', config.OS_DEFAULT_KEY_NAME)}` private key.\n"
+                f"To access this instance via SSH, you should have the private key with fingerprint `{key_pair['KeyFingerprint']}`.\n"
                 "If you don't have it, please contact the admin for access."
             )
 
@@ -145,6 +192,24 @@ def handle_create_openstack_vm(say, user, params_dict):
 
 
 # Helper function to list OpenStack VMs with error handling
+@command_meta(
+    name="list-openstack-vms",
+    description="List OpenStack VMs with optional status filtering",
+    arguments={
+        "status": {
+            "description": "Filter VMs by status",
+            "required": False,
+            "type": "str",
+            "choices": get_openstack_statuses,
+            "default": "ACTIVE",
+        }
+    },
+    examples=[
+        "list-openstack-vms",
+        "list-openstack-vms --status=ACTIVE",
+        "list-openstack-vms --status=SHUTOFF",
+    ],
+)
 def handle_list_openstack_vms(say, params_dict):
     try:
         if not isinstance(params_dict, dict):
@@ -206,11 +271,40 @@ def handle_list_openstack_vms(say, params_dict):
 
 
 # Helper function to handle greeting
+@command_meta(name="hello", description="Greet the bot", examples=["hello"])
 def handle_hello(say, user):
     logger.info(f"Saying hello back to user {user}")
     say(f"Hello <@{user}>! How can I assist you today?")
 
 
+@command_meta(
+    name="create-aws-vm",
+    description="Create an AWS EC2 instance",
+    arguments={
+        "os_name": {
+            "description": "Operating system name",
+            "required": True,
+            "type": "str",
+            "choices": ["linux"],
+        },
+        "instance_type": {
+            "description": "EC2 instance type",
+            "required": True,
+            "type": "str",
+            "choices": get_aws_instance_types,
+        },
+        "key_pair": {
+            "description": "Key pair option",
+            "required": True,
+            "type": "str",
+            "choices": ["new", "existing"],
+        },
+    },
+    examples=[
+        "create-aws-vm --os_name=linux --instance_type=t2.micro --key_pair=new",
+        "create-aws-vm --os_name=linux --instance_type=t3.small --key_pair=existing",
+    ],
+)
 def handle_create_aws_vm(say, user, region, app, params_dict):
     try:
         if not isinstance(params_dict, dict):
@@ -243,13 +337,13 @@ def handle_create_aws_vm(say, user, region, app, params_dict):
             return
 
         # Key pair should be either 'new' or 'existing'
-        key_pair = key_pair.strip().lower()
+        key_pair = key_pair.strip().lower() if key_pair else ""
         if key_pair not in {"new", "existing"}:
             say(":warning: `key_pair` should be either `new` or `existing`")
             return
 
         # Ensure os_name is either 'Linux' or 'linux'
-        if os_name.strip().lower() == "linux":
+        if os_name and os_name.strip().lower() == "linux":
             logger.info(f"Operating System selected: {os_name}")
 
             # Use the hardcoded AMI ID for Amazon Linux
@@ -266,7 +360,7 @@ def handle_create_aws_vm(say, user, region, app, params_dict):
 
             # Select key to use
             key_to_use = _helper_select_keypair(
-                key_pair, user, app, os_name, instance_type, say, ec2_helper
+                key_pair, user, app, "AWS", os_name, instance_type, say, ec2_helper
             )
 
             if not key_to_use:
@@ -445,6 +539,35 @@ def helper_display_dict_output_as_table(instances_dict, print_keys, say, block_m
 
 
 # Helper function to list AWS EC2 instances
+@command_meta(
+    name="list-aws-vms",
+    description="List AWS EC2 instances with optional filtering",
+    arguments={
+        "state": {
+            "description": "Filter instances by state",
+            "required": False,
+            "type": "str",
+            "choices": get_aws_instance_states,
+        },
+        "type": {
+            "description": "Filter instances by type",
+            "required": False,
+            "type": "str",
+            "choices": get_aws_instance_types,
+        },
+        "instance-ids": {
+            "description": "Comma-separated list of instance IDs",
+            "required": False,
+            "type": "str",
+        },
+    },
+    examples=[
+        "list-aws-vms",
+        "list-aws-vms --state=running,stopped",
+        "list-aws-vms --type=t2.micro,t3.small",
+        "list-aws-vms --instance-ids=i-123456,i-789012",
+    ],
+)
 def handle_list_aws_vms(say, region, user, params_dict):
     try:
         if not isinstance(params_dict, dict):
@@ -482,6 +605,27 @@ def handle_list_aws_vms(say, region, user, params_dict):
         say("An internal error occurred, please contact administrator.")
 
 
+@command_meta(
+    name="aws-modify-vm",
+    description="Stop or delete AWS EC2 instances",
+    arguments={
+        "vm-id": {
+            "description": "Instance ID to modify",
+            "required": True,
+            "type": "str",
+        },
+        "stop": {"description": "Stop the instance", "required": False, "type": "bool"},
+        "delete": {
+            "description": "Delete the instance",
+            "required": False,
+            "type": "bool",
+        },
+    },
+    examples=[
+        "aws-modify-vm --stop --vm-id=i-1234567890abcdef0",
+        "aws-modify-vm --delete --vm-id=i-1234567890abcdef0",
+    ],
+)
 def handle_aws_modify_vm(say, region, user, params_dict):
     """
     Helper function to modify AWS EC2 instances (stop/delete)
@@ -568,40 +712,21 @@ def handle_aws_modify_vm(say, region, user, params_dict):
 
 
 # Helper function to list important team links
+@command_meta(
+    name="list-team-links",
+    description="Display important team links",
+    examples=["list-team-links"],
+)
 def handle_list_team_links(say, user):
     say(
         text=".",
         blocks=helper_setup_slack_header_line(" Here are the important team links:"),
     )
 
-    important_links = [
-        ("Release Controller Page", "https://amd64.ocp.releases.ci.openshift.org/"),
-        (
-            "OCP Sustaining Confluence Space",
-            "https://spaces.redhat.com/display/SustainingEngineering/OpenShift+Sustaining+Engineering",
-        ),
-        (
-            "SE Operational Jira Dashboard",
-            "https://issues.redhat.com/secure/Dashboard.jspa",
-        ),
-        (
-            "OpenStack Login Page",
-            "https://cloud.psi.redhat.com/dashboard/project/instances/",
-        ),
-        (
-            "OCP SE Attendance Sheet",
-            "https://docs.google.com/spreadsheets/d/108tMw1JqGE7dqOmToo7G2MfvLMtfOxdkX5OXNW0OBt4/edit?gid=585683499#gid=585683499",
-        ),
-        (
-            "OCP Teams Tracker Sheet",
-            "https://docs.google.com/spreadsheets/d/1I0wzqmkBxSmoRtSCEBUe4nXHvPLQ3K959t8VWnOhurA/edit?gid=1529539181#gid=1529539181",
-        ),
-    ]
-
     link_lines = "\n".join(
         [
             f":small_orange_diamond: *{title}:* <{url}|Link>"
-            for title, url in important_links
+            for title, url in config.USEFUL_PROJECT_LINKS.items()
         ]
     )
 
@@ -619,7 +744,7 @@ def handle_list_team_links(say, user):
 
 
 def _helper_select_keypair(
-    key_option, user, app, os_name, instance_type, say, cloud_sdk_obj
+    key_option, user, app, cloud_type, os_name, instance_type, say, cloud_sdk_obj
 ):
     key_to_use = {}
 
@@ -644,10 +769,11 @@ def _helper_select_keypair(
         # DM user with private key
         app.client.chat_postMessage(
             channel=user,
-            text=f"New key created:\n```{new_key['KeyMaterial']}```\n"
-            + f"Cloud: AWS, OS: {os_name}, Instance: {instance_type}",
+            text=f"""New key created:\n```{new_key["KeyMaterial"]}```
+                  Cloud: {cloud_type}, OS: {os_name}, Instance: {instance_type}""",
         )
         logger.debug("Sent private key in user DM.")
+        say("Please check DM for the newly generated private key.")
 
         key_to_use = {
             "KeyName": new_key["KeyName"],
